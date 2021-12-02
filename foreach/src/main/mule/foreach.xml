@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:vm="http://www.mulesoft.org/schema/mule/vm" xmlns:batch="http://www.mulesoft.org/schema/mule/batch"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="696f2738-9145-48be-aeb3-aa75456c2b06" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<db:config name="Database_Config" doc:name="Database Config" doc:id="25dcce80-56b1-40ee-8fca-f39c6da64975" >
+		<db:my-sql-connection host="localhost" port="3306" user="root" password="Msdrjsdk@007" database="db2" />
+	</db:config>
+	<vm:config name="VM_Config" doc:name="VM Config" doc:id="34fe9962-0c67-4166-893d-03e18e501460" >
+		<vm:queues >
+			<vm:queue queueName="sql" />
+		</vm:queues>
+	</vm:config>
+	<flow name="foreachFlow" doc:id="6110d718-2da8-41c7-abe4-a8e8f2d28827" >
+		<http:listener doc:name="Listener" doc:id="f946ed81-6b28-448e-b356-91a1e042f91a" config-ref="HTTP_Listener_config" path="/foreach" allowedMethods="GET,POST"/>
+		<ee:transform doc:name="Transform Message" doc:id="b18b48b9-31d7-414b-9672-35a732447f1b" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+1 to 100 map{
+     userID: $.userId,
+     jobTitleName: $.jobTitleName,
+     firstName: $.firstName,
+     lastName: $.lastName,
+     preferredFullName: $.preferredFullName,
+     employeeCode: $.employeeCode ,
+     region: $.region,
+     phoneNumber: $.phoneNumber,
+     emailAddress: $.emailAddress
+
+ }]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<batch:job jobName="foreachBatch_Job" doc:id="b2b127c0-a6ef-40ec-a2e0-d567eb2b631f" >
+			<batch:process-records >
+				<batch:step name="Batch_Step" doc:id="7b9ce954-7137-44b9-9934-91d60d915795" acceptPolicy="ALL">
+					<batch:aggregator doc:name="Batch Aggregator" doc:id="c62e4c9c-a8bc-4a88-9664-a15fcd638ab9" size="5">
+						<logger level="INFO" doc:name="Logger" doc:id="f7d8a99d-4a72-497f-801d-553e583437cb" message="#[payload]"/>
+						<db:bulk-insert doc:name="Bulk insert" doc:id="c2969901-467b-45a0-a5ac-537ea82ccf37" config-ref="Database_Config">
+							<db:sql ><![CDATA[insert into db2.student (id,name,age) values (:id, :name, :age)]]></db:sql>
+						</db:bulk-insert>
+						<logger level="INFO" doc:name="Logger" doc:id="1ba6caed-203e-46c8-97d4-98b40238137d" message="#[payload]"/>
+					</batch:aggregator>
+				</batch:step>
+			</batch:process-records>
+			<batch:on-complete>
+				<ee:transform doc:name="Transform Message" doc:id="71ff3ad4-0c8a-4070-b80c-b3d8352479cb" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<logger level="INFO" doc:name="Logger" doc:id="cbd90a24-a765-41b6-8374-a0e98687b80c" message="#[payload]"/>
+			</batch:on-complete>
+		</batch:job>
+	</flow>
+</mule>
